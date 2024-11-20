@@ -1,4 +1,4 @@
-<html>
+<html lang="on">
 <head>
     <title>RPG</title>
     <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
@@ -6,6 +6,50 @@
 </head>
 <body>
 <h1>RPG admin panel</h1>
+<table id = "PlayersTable">
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Race</th>
+        <th>Profession</th>
+        <th>Level</th>
+        <th>Birthday</th>
+        <th>Banned</th>
+    </tr>
+</table>
+
+<script>
+    function fetchAndRenderPlayers() {
+        $.get('/rest/players', function(players) {
+            const $table = $('#PlayersTable');
+
+            if ($table.length === 0) {
+                console.error('Table with ID "PlayersTable" not found.');
+                return;
+            }
+
+            players.forEach((player, index) => {
+                const row = `
+                <tr>
+                    <td>${player.id}</td>
+                    <td>${player.name}</td>
+                    <td>${player.title}</td>
+                    <td>${player.race}</td>
+                    <td>${player.profession}</td>
+                    <td>${player.level}</td>
+                    <td>${new Date(player.birthday).toLocaleDateString()}</td>
+                    <td>${player.banned}</td>
+                </tr>
+            `;
+                $table.append(row);
+            });
+        }).fail(function(error) {
+            console.error('Error loading data:', error);
+        });
+    }
+    $(document).ready(fetchAndRenderPlayers);
+</script>
 
 </body>
 </html>
