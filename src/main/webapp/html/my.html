@@ -6,6 +6,15 @@
 </head>
 <body>
 <h1>RPG admin panel</h1>
+<h2>Accounts list:</h2>
+<label for="rowsPerPage">Count per page:</label>
+<select id="rowsPerPage">
+    <option value="3">3</option>
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="20">20</option>
+</select>
+
 <table id = "PlayersTable">
     <tr>
         <th>#</th>
@@ -16,12 +25,31 @@
         <th>Level</th>
         <th>Birthday</th>
         <th>Banned</th>
+        <th>Edit</th>
+        <th>Delete</th>
     </tr>
 </table>
+<div id="pagination">
+    Pages:
+</div>
 
 <script>
-    function fetchAndRenderPlayers() {
-        $.get('/rest/players', function(players) {
+    function fetchAndRenderPlayers(page) {
+        $("tr:has(td)").remove();
+
+        let url = "/rest/players?";
+        let rowsPerPage = $('#rowsPerPage').val();
+        if (rowsPerPage == null) {
+            rowsPerPage = 3;
+        }
+        url = url.concat("pageSize=").concat(rowsPerPage);
+
+        if (page == null) {
+            page = 0;
+        }
+        url = url.concat("&pageNumber=").concat(page);
+
+        $.get(url, function (players) {
             const $table = $('#PlayersTable');
 
             if ($table.length === 0) {
@@ -29,26 +57,105 @@
                 return;
             }
 
-            players.forEach((player, index) => {
+            players.forEach((player) => {
                 const row = `
-                <tr>
-                    <td>${player.id}</td>
-                    <td>${player.name}</td>
-                    <td>${player.title}</td>
-                    <td>${player.race}</td>
-                    <td>${player.profession}</td>
-                    <td>${player.level}</td>
-                    <td>${new Date(player.birthday).toLocaleDateString()}</td>
-                    <td>${player.banned}</td>
-                </tr>
-            `;
+            <tr>
+                <td>${player.id}</td>
+                <td>${player.name}</td>
+                <td>${player.title}</td>
+                <td>${player.race}</td>
+                <td>${player.profession}</td>
+                <td>${player.level}</td>
+                <td>${new Date(player.birthday).toLocaleDateString()}</td>
+                <td>${player.banned}</td>
+                <td>
+                    <button id="button_edit_${player.id}" onclick="editPlayer(${player.id})">
+                        <img src="/img/edit.png" class="icon" alt="Edit">
+                    </button>
+                </td>
+                <td>
+                    <button id="button_delete_${player.id}" onclick="deletePlayer(${player.id})">
+                        <img src="/img/delete.png" class="icon delete-icon" alt="Delete">
+                    </button>
+                </td>
+            </tr>
+        `;
                 $table.append(row);
             });
-        }).fail(function(error) {
+        }).fail(function (error) {
             console.error('Error loading data:', error);
         });
+
+        let totalPages = Math.ceil(fetchTotalPlayers() / rowsPerPage);
+
+        $("button.pgn-bnt-styled").remove();
+
+        for (let i = 0; i < totalPages; i++) {
+            let button_tag = "<button>" + (i + 1) + "</button>";
+            let btn = $(button_tag)
+                .attr('id', "pagination_" + i)
+                .attr('data-page', i)
+                .addClass('pgn-bnt-styled');
+
+            $('#pagination').append(btn);
+        }
+
+        $(".pgn-bnt-styled").off('click').on('click', function () {
+            const page = $(this).data('page');
+            fetchAndRenderPlayers(page);
+        });
+
+        let ident = "#pagination_" + page;
+        $(ident).css('color', 'red');
     }
-    $(document).ready(fetchAndRenderPlayers);
+
+    function deletePlayer(playerId) {
+        if (!confirm("Are you sure you want to delete this player?")) return;
+        const currentPage = $(".pgn-bnt-styled[style='color: red;']").data('page') || 0;
+        $.ajax({
+            url: `/rest/players/${playerId}`,
+            method: "DELETE",
+            success: function () {
+                alert("Player deleted successfully.");
+                fetchAndRenderPlayers(currentPage);
+            },
+            error: function (xhr) {
+                if (xhr.status === 404) {
+                    alert("Player not found.");
+                } else if (xhr.status === 400) {
+                    alert("Invalid player ID.");
+                } else {
+                    alert("An error occurred while deleting the player.");
+                }
+            }
+        });
+    }
+
+
+
+    $(document).ready(function () {
+        $('#rowsPerPage').on('change', function () {
+            fetchAndRenderPlayers();
+        });
+
+        fetchAndRenderPlayers();
+    });
+
+
+    function fetchTotalPlayers() {
+        let url = '/rest/players/count';
+        let res = 0;
+        $.ajax({
+            url: url,
+            async: false,
+            success: function (result) {
+                res = parseInt(result);
+            }
+        }).fail(function (error) {
+            console.error('Error loading data:', error);
+        })
+        return res;
+    }
 </script>
 
 </body>
