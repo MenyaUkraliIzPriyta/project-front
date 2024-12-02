@@ -12,11 +12,12 @@ th, td {
     text-align: center;
 }
 
-tr:not(:first-child):hover {
+#table tbody tr:hover {
     background-color: cornflowerblue;
 }
 
-#pagination button {
+
+#paginationButtons button {
     margin: 5px;
     padding: 5px 10px;
     cursor: pointer;
@@ -28,6 +29,15 @@ tr:not(:first-child):hover {
     vertical-align: middle;
     cursor: pointer;
 }
+
+button.active {
+    background-color: red;
+    color: white;
+    font-weight: bold;
+    border: none;
+    cursor: default;
+}
+
 
 
 

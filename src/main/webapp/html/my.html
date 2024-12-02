@@ -1,21 +1,25 @@
-<html lang="on">
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <title>RPG</title>
-    <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
-    <link href="/css/my.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="/css/my.css">
 </head>
 <body>
 <h1>RPG admin panel</h1>
-<h2>Accounts list:</h2>
-<label for="rowsPerPage">Count per page:</label>
-<select id="rowsPerPage">
-    <option value="3">3</option>
-    <option value="5">5</option>
-    <option value="10">10</option>
-    <option value="20">20</option>
-</select>
 
-<table id = "PlayersTable">
+<div id="paging">
+    <label for="countPerPage">Count per page:</label>
+    <select id="countPerPage">
+        <option value="3">3</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+    </select>
+</div>
+
+<table id="table">
+    <thead>
     <tr>
         <th>#</th>
         <th>Name</th>
@@ -28,135 +32,296 @@
         <th>Edit</th>
         <th>Delete</th>
     </tr>
+    </thead>
+    <tbody></tbody>
 </table>
-<div id="pagination">
-    Pages:
+
+<div id="paginationButtons"></div>
+
+<div id="createPlayerForm">
+    <h2>Create New Player</h2>
+    <p></p><label for="newPlayerName">Name:</label>
+    <input type="text" id="newPlayerName" required>
+
+
+    <p></p><label for="newPlayerTitle">Title:</label>
+    <input type="text" id="newPlayerTitle" required>
+
+    <p></p><label for="newPlayerRace">Race:</label>
+    <select id="newPlayerRace" required>
+        <option value="HUMAN">HUMAN</option>
+        <option value="DWARF">DWARF</option>
+        <option value="ELF">ELF</option>
+        <option value="GIANT">GIANT</option>
+        <option value="ORC">ORC</option>
+        <option value="TROLL">TROLL</option>
+        <option value="HOBBIT">HOBBIT</option>
+    </select>
+
+    <p></p><label for="newPlayerProfession">Profession:</label>
+    <select id="newPlayerProfession" required>
+        <option value="WARRIOR">WARRIOR</option>
+        <option value="ROGUE">ROGUE</option>
+        <option value="SORCERER">SORCERER</option>
+        <option value="CLERIC">CLERIC</option>
+        <option value="PALADIN">PALADIN</option>
+        <option value="NAZGUL">NAZGUL</option>
+        <option value="WARLOCK">WARLOCK</option>
+        <option value="DRUID">DRUID</option>
+    </select>
+
+    <p></p><label for="newPlayerLevel">Level:</label>
+    <input type="number" id="newPlayerLevel" min="0" max="100" required>
+
+    <p></p><label for="newPlayerBirthday">Birthday:</label>
+    <input type="date" id="newPlayerBirthday" required>
+
+    <p></p><label for="newPlayerBanned">Banned:</label>
+    <select id="newPlayerBanned" required>
+        <option value="false">false</option>
+        <option value="true">true</option>
+    </select>
+
+    <p></p>
+    <button id="createPlayerButton">Create Player</button>
 </div>
 
 <script>
-    function fetchAndRenderPlayers(page) {
-        $("tr:has(td)").remove();
+    $(document).ready(function () {
+        let totalElements = 0;
+        let currentPage = 0;
+        let totalPages = 0;
 
-        let url = "/rest/players?";
-        let rowsPerPage = $('#rowsPerPage').val();
-        if (rowsPerPage == null) {
-            rowsPerPage = 3;
+        $("#countPerPage").on('change', function () {
+            currentPage = 0;
+            getTotalElements();
+        });
+
+        function getTotalElements() {
+            $.get('/rest/players/count', function (count) {
+                totalElements = count;
+                totalPages = Math.ceil(totalElements / $('#countPerPage').val());
+                generatePaginationButtons();
+                loadData();
+            });
         }
-        url = url.concat("pageSize=").concat(rowsPerPage);
 
-        if (page == null) {
-            page = 0;
+        function loadData() {
+            const countPerPage = $('#countPerPage').val();
+
+            $.get(`/rest/players?pageNumber=${currentPage}&pageSize=${countPerPage}`, function (data) {
+                let tableBody = $('#table tbody');
+                tableBody.empty();
+
+                $.each(data, function (index, item) {
+                    // We use the createPlayerRow function to create a new row for each player.
+                    let newRow = createPlayerRow(item);
+                    tableBody.append(newRow);
+                });
+
+                generatePaginationButtons();
+            });
         }
-        url = url.concat("&pageNumber=").concat(page);
 
-        $.get(url, function (players) {
-            const $table = $('#PlayersTable');
+        function generatePaginationButtons() {
+            let paginationDiv = $('#paginationButtons');
+            paginationDiv.empty();
 
-            if ($table.length === 0) {
-                console.error('Table with ID "PlayersTable" not found.');
+            for (let i = 0; i < totalPages; i++) {
+                let button = $('<button>').text(i + 1);
+
+                // If this is the current page, add the class "active"
+                if (i === currentPage) {
+                    button.addClass('active');
+                }
+
+                // Bind an event handler to navigate to another page
+                button.on('click', function () {
+                    if (i !== currentPage) {
+                        currentPage = i;
+                        loadData();
+                    }
+                });
+
+                paginationDiv.append(button);
+            }
+        }
+
+
+        function createPlayerRow(item) {
+            let newRow = $('<tr>');
+            let date = new Date(item.birthday);
+            let month = (date.getMonth() + 1).toString().padStart(2, '0');
+            let day = date.getDate().toString().padStart(2, '0');
+            let year = date.getFullYear().toString();
+            let birthdate = `${month}/${day}/${year}`;
+
+            let editImage = $('<img src="/img/edit.png" class="icon">');
+            let deleteImage = $('<img src="/img/delete.png" class="icon">');
+
+            editImage.click(function () {
+                let currentRow = $(this).closest('tr');
+                currentRow.find('td').each(function (index) {
+                    let cell = $(this);
+                    let text = cell.text();
+
+                    if (index === 1 || index === 2) {
+                        cell.empty();
+                        let input = $('<input type="text">');
+                        input.val(text);
+                        cell.append(input);
+                    } else if (index === 3) {
+                        cell.empty();
+                        let races = ["HUMAN", "DWARF", "ELF", "GIANT", "ORC", "TROLL", "HOBBIT"];
+                        let dropdown = createDropdown(races, item.race);
+                        cell.append(dropdown);
+                    } else if (index === 4) {
+                        cell.empty();
+                        let professions = ["WARRIOR", "ROGUE", "SORCERER", "CLERIC",
+                            "PALADIN", "NAZGUL", "WARLOCK", "DRUID"];
+                        let dropdown = createDropdown(professions, item.profession);
+                        cell.append(dropdown);
+                    } else if (index === 7) {
+                        cell.empty();
+                        let values = ["false", "true"];
+                        let dropdown = createDropdown(values, item.banned);
+                        dropdown.val(text);
+                        cell.append(dropdown);
+                    } else if (index === 8) {
+                        editImage.attr('src', '/img/save.png');
+                        editImage.attr('class', 'icon');
+                    } else if (index === 9) {
+                        cell.empty();
+                    }
+
+                    editImage.off("click").click(function () {
+                        let currentRow = $(this).closest('tr');
+
+                        let name = currentRow.find('td:eq(1) input').val();
+                        let title = currentRow.find('td:eq(2) input').val();
+                        let race = currentRow.find('td:eq(3) select').val();
+                        let profession = currentRow.find('td:eq(4) select').val();
+                        let banned = currentRow.find('td:eq(7) select').val();
+                        let requestData = {
+                            "name": name,
+                            "title": title,
+                            "race": race,
+                            "profession": profession,
+                            "banned": banned,
+                        };
+
+                        $.ajax({
+                            type: "POST",
+                            url: "/rest/players/" + item.id,
+                            contentType: "application/json",
+                            data: JSON.stringify(requestData),
+                            success: function (response) {
+                                getTotalElements();
+                            },
+                            error: function (error) {
+                                alert(error.message);
+                            }
+                        });
+                    });
+                });
+            });
+
+            deleteImage.click(function () {
+                let playerId = item.id;
+                $.ajax({
+                    type: 'DELETE',
+                    url: '/rest/players/' + playerId,
+                    success: function (response) {
+                        getTotalElements();
+                    },
+                    error: function (error) {
+                        alert('Error');
+                    }
+                });
+            });
+
+            newRow.append('<td>' + item.id + '</td>');
+            newRow.append('<td>' + item.name + '</td>');
+            newRow.append('<td>' + item.title + '</td>');
+            newRow.append('<td>' + item.race + '</td>');
+            newRow.append('<td>' + item.profession + '</td>');
+            newRow.append('<td>' + item.level + '</td>');
+            newRow.append('<td>' + birthdate + '</td>');
+            newRow.append('<td>' + item.banned + '</td>');
+            newRow.append($('<td>').append(editImage));
+            newRow.append($('<td>').append(deleteImage));
+
+            return newRow;
+        }
+
+        function createDropdown(options, selectedValue) {
+            let dropdown = $('<select>');
+
+            $.each(options, function (index, optionValue) {
+                let option = $('<option>').text(optionValue).attr('value', optionValue);
+                if (optionValue === selectedValue) {
+                    option.attr('selected', true);
+                }
+                dropdown.append(option);
+            });
+
+            return dropdown;
+        }
+
+        $('#createPlayerButton').on('click', function () {
+            let newName = $('#newPlayerName').val();
+            let newTitle = $('#newPlayerTitle').val();
+            let newRace = $('#newPlayerRace').val();
+            let newProfession = $('#newPlayerProfession').val();
+            let newLevel = $('#newPlayerLevel').val();
+            let newBirthday = $('#newPlayerBirthday').val();
+            let newBanned = $('#newPlayerBanned').val();
+
+            let date = new Date(newBirthday);
+
+            if (!newName || !newTitle || !newRace || !newProfession || !newLevel || !newBirthday || !newBanned) {
+                alert('Fill in all fields.');
                 return;
             }
 
-            players.forEach((player) => {
-                const row = `
-            <tr>
-                <td>${player.id}</td>
-                <td>${player.name}</td>
-                <td>${player.title}</td>
-                <td>${player.race}</td>
-                <td>${player.profession}</td>
-                <td>${player.level}</td>
-                <td>${new Date(player.birthday).toLocaleDateString()}</td>
-                <td>${player.banned}</td>
-                <td>
-                    <button id="button_edit_${player.id}" onclick="editPlayer(${player.id})">
-                        <img src="/img/edit.png" class="icon" alt="Edit">
-                    </button>
-                </td>
-                <td>
-                    <button id="button_delete_${player.id}" onclick="deletePlayer(${player.id})">
-                        <img src="/img/delete.png" class="icon delete-icon" alt="Delete">
-                    </button>
-                </td>
-            </tr>
-        `;
-                $table.append(row);
-            });
-        }).fail(function (error) {
-            console.error('Error loading data:', error);
-        });
+            if (newName.length > 12 || newTitle.length > 30) {
+                alert('Name and Title should not exceed 12 and 30 characters, respectively.');
+                return;
+            }
 
-        let totalPages = Math.ceil(fetchTotalPlayers() / rowsPerPage);
+            if (newLevel < 0 || newLevel > 100) {
+                alert('Level should be between 0 and 100.');
+                return;
+            }
 
-        $("button.pgn-bnt-styled").remove();
 
-        for (let i = 0; i < totalPages; i++) {
-            let button_tag = "<button>" + (i + 1) + "</button>";
-            let btn = $(button_tag)
-                .attr('id', "pagination_" + i)
-                .attr('data-page', i)
-                .addClass('pgn-bnt-styled');
+            let newPlayerData = {
+                "name": newName,
+                "title": newTitle,
+                "race": newRace,
+                "profession": newProfession,
+                "level": newLevel,
+                "birthday": date.getTime(),
+                "banned": newBanned
+            };
 
-            $('#pagination').append(btn);
-        }
-
-        $(".pgn-bnt-styled").off('click').on('click', function () {
-            const page = $(this).data('page');
-            fetchAndRenderPlayers(page);
-        });
-
-        let ident = "#pagination_" + page;
-        $(ident).css('color', 'red');
-    }
-
-    function deletePlayer(playerId) {
-        if (!confirm("Are you sure you want to delete this player?")) return;
-        const currentPage = $(".pgn-bnt-styled[style='color: red;']").data('page') || 0;
-        $.ajax({
-            url: `/rest/players/${playerId}`,
-            method: "DELETE",
-            success: function () {
-                alert("Player deleted successfully.");
-                fetchAndRenderPlayers(currentPage);
-            },
-            error: function (xhr) {
-                if (xhr.status === 404) {
-                    alert("Player not found.");
-                } else if (xhr.status === 400) {
-                    alert("Invalid player ID.");
-                } else {
-                    alert("An error occurred while deleting the player.");
+            $.ajax({
+                type: "POST",
+                url: "/rest/players",
+                contentType: "application/json",
+                data: JSON.stringify(newPlayerData),
+                success: function (response) {
+                    getTotalElements();
+                },
+                error: function (error) {
+                    alert(error.message);
                 }
-            }
-        });
-    }
-
-
-
-    $(document).ready(function () {
-        $('#rowsPerPage').on('change', function () {
-            fetchAndRenderPlayers();
+            });
         });
 
-        fetchAndRenderPlayers();
+        getTotalElements();
     });
-
-
-    function fetchTotalPlayers() {
-        let url = '/rest/players/count';
-        let res = 0;
-        $.ajax({
-            url: url,
-            async: false,
-            success: function (result) {
-                res = parseInt(result);
-            }
-        }).fail(function (error) {
-            console.error('Error loading data:', error);
-        })
-        return res;
-    }
 </script>
-
 </body>
 </html>
+
